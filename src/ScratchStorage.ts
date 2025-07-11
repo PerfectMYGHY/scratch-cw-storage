@@ -8,6 +8,8 @@ import {AssetType as _AssetType, AssetType} from './AssetType';
 import {DataFormat as _DataFormat, DataFormat} from './DataFormat';
 import _scratchFetch from './scratchFetch';
 import Helper from './Helper';
+import createEventEmitter, {EventEmitter} from './EventEmitter';
+import AssetInfo from './AssetInfo';
 
 interface HelperWithPriority {
     helper: Helper,
@@ -20,6 +22,11 @@ export class ScratchStorage {
     public webHelper: WebHelper;
 
     private _helpers: HelperWithPriority[];
+    private currentProjectAssets: (string | AssetInfo)[];
+    private projectAssetsOK: boolean;
+    public eventEmitter: EventEmitter;
+    public assetHost: string;
+    public currentAssetFrom: string;
 
     constructor () {
         this.defaultAssetId = {};
@@ -38,13 +45,19 @@ export class ScratchStorage {
                 priority: -100
             }
         ];
+
+        this.currentProjectAssets = [];
+        this.projectAssetsOK = false;
+        this.eventEmitter = createEventEmitter();
+        this.assetHost = 'http://127.0.0.1:8006';
+        this.currentAssetFrom = 'asset';
     }
 
     /**
      * @return {Asset} - the `Asset` class constructor.
      * @constructor
      */
-    get Asset () {
+    public get Asset () {
         return _Asset;
     }
 
@@ -52,7 +65,7 @@ export class ScratchStorage {
      * @return {AssetType} - the list of supported asset types.
      * @constructor
      */
-    get AssetType () {
+    public get AssetType () {
         return _AssetType;
     }
 
@@ -60,7 +73,7 @@ export class ScratchStorage {
      * @return {DataFormat} - the list of supported data formats.
      * @constructor
      */
-    get DataFormat () {
+    public get DataFormat () {
         return _DataFormat;
     }
 
@@ -68,7 +81,7 @@ export class ScratchStorage {
      * Access the `scratchFetch` module within this library.
      * @return {module} the scratchFetch module, with properties for `scratchFetch`, `setMetadata`, etc.
      */
-    get scratchFetch () {
+    public get scratchFetch () {
         return _scratchFetch;
     }
 
@@ -77,7 +90,7 @@ export class ScratchStorage {
      * @return {Asset} - the `Asset` class constructor.
      * @constructor
      */
-    static get Asset () {
+    public static get Asset () {
         return _Asset;
     }
 
@@ -86,7 +99,7 @@ export class ScratchStorage {
      * @return {AssetType} - the list of supported asset types.
      * @constructor
      */
-    static get AssetType () {
+    public static get AssetType () {
         return _AssetType;
     }
 
@@ -167,7 +180,6 @@ export class ScratchStorage {
      * @param {UrlFunction} urlFunction - A function which computes a GET URL from an Asset.
      */
     addWebSource (types: AssetType[], urlFunction: UrlFunction): void {
-        log.warn('Deprecation: Storage.addWebSource has been replaced by addWebStore.');
         this.addWebStore(types, urlFunction);
     }
 
@@ -252,6 +264,8 @@ export class ScratchStorage {
     store (assetType: AssetType, dataFormat: DataFormat | null | undefined, data: AssetData, assetId?: AssetId) {
         dataFormat = dataFormat || assetType.runtimeFormat;
 
+        this.addAssetToCurrentProjectAssets(assetType, String(assetId), dataFormat, true, true, data);
+
         return this.webHelper.store(assetType, dataFormat, data, assetId)
             .then(body => {
                 // The previous logic here ignored that the body can be a string (if it's not a JSON),
@@ -263,5 +277,79 @@ export class ScratchStorage {
                 this.builtinHelper._store(assetType, dataFormat, data, id);
                 return body;
             });
+    }
+
+    /**
+     * 删除当前作品的总资源记录
+     */
+    clearCurrentProjectAssets () {
+        this.projectAssetsOK = false;
+        this.currentProjectAssets = [];
+    }
+
+    /**
+     * 向当前作品总资源记录中添加资源ID
+     * @param {AssetType} assetType 资源类型
+     * @param {string} assetId 资源ID
+     * @param {DataFormat} dataFormat 数据格式
+     * @param {boolean} addExt 是否添加后缀名
+     * @param {boolean} useObject 是否使用对象存储
+     * @param {AssetData} data 资源数据
+     */
+    addAssetToCurrentProjectAssets (
+        assetType: AssetType,
+        assetId: string,
+        dataFormat: DataFormat,
+        addExt: boolean = false,
+        useObject: boolean = false,
+        data: AssetData | undefined
+    ) {
+        if (this.projectAssetsOK) {
+            return;
+        }
+        let addString: string = assetId;
+        if (addExt) {
+            addString += `.${dataFormat}`;
+        }
+        if (this._helpers[0].helper.load(assetType, assetId, dataFormat) === null) {
+            if (useObject) {
+                const assetInfo: AssetInfo = {
+                    assetType,
+                    assetId,
+                    dataFormat,
+                    data,
+                    assetName: addString
+                };
+                if (!this.currentProjectAssets.includes(assetInfo)) {
+                    this.currentProjectAssets.push(assetInfo);
+                }
+            } else if (!this.currentProjectAssets.includes(addString)) {
+                this.currentProjectAssets.push(addString);
+            }
+        }
+    }
+
+    /**
+     * 获取当前作品总资源记录
+     * @returns {Array<string | AssetInfo>} 当前作品总资源记录
+     */
+    getCurrentProjectAssets () : Array<string | AssetInfo> {
+        return this.currentProjectAssets;
+    }
+
+    /**
+     * 完结当前作品总资源记录
+     */
+    finishCurrentProjectAssets () {
+        this.projectAssetsOK = true;
+        this.eventEmitter.emit('finish');
+    }
+
+    /**
+     * 获取当前作品总记录是否完结
+     * @returns {boolean} 是否完结
+     */
+    getCurrentProjectAssetsIsOK () : boolean {
+        return this.projectAssetsOK;
     }
 }

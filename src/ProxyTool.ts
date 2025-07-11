@@ -1,14 +1,9 @@
 import FetchWorkerTool from './FetchWorkerTool';
 import {FetchTool} from './FetchTool';
+import ZipFetchTool from './ZipFetchTool';
 import {ScratchGetRequest, ScratchSendRequest, Tool} from './Tool';
+import {ScratchStorage} from './ScratchStorage';
 
-/**
- * @typedef {object} Request
- * @property {string} url
- * @property {*} body
- * @property {string} method
- * @property {boolean} withCredentials
- */
 
 type ToolFilter = typeof ProxyTool.TOOL_FILTER[keyof typeof ProxyTool.TOOL_FILTER];
 
@@ -34,12 +29,12 @@ export default class ProxyTool implements Tool {
         READY: 'ready'
     } as const;
 
-    constructor (filter: ToolFilter = ProxyTool.TOOL_FILTER.ALL) {
+    constructor (parent: ScratchStorage, filter: ToolFilter = ProxyTool.TOOL_FILTER.ALL) {
         let tools: Tool[];
         if (filter === ProxyTool.TOOL_FILTER.READY) {
             tools = [new FetchTool()];
         } else {
-            tools = [new FetchWorkerTool(), new FetchTool()];
+            tools = [new ZipFetchTool(parent), new FetchWorkerTool(), new FetchTool()];
         }
 
         /**
@@ -72,7 +67,9 @@ export default class ProxyTool implements Tool {
             if (!tool.isGetSupported) {
                 return nextTool(err);
             }
-            return tool.get(reqConfig).catch(nextTool);
+            return tool.get(reqConfig).catch(error => {
+                return nextTool(error);
+            });
         };
         return nextTool();
     }

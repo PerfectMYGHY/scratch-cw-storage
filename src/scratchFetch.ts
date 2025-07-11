@@ -1,5 +1,14 @@
-// import crossFetch from 'cross-fetch';
-const crossFetch = require('cross-fetch');
+/**
+ * Metadata header names
+ * @enum {string} The enum value is the name of the associated header.
+ * @readonly
+ */
+const RequestMetadata = {
+    /** The ID of the project associated with this request */
+    ProjectId: 'X-Project-ID',
+    /** The ID of the project run associated with this request */
+    RunId: 'X-Run-ID'
+};
 
 /**
  * Metadata header names
@@ -13,7 +22,11 @@ interface RequestMetadata {
     RunId: 'X-Run-ID'
 }
 
-const metadata: Headers = new crossFetch.Headers();
+/**
+ * Metadata headers for requests
+ * @type {Headers}
+ */
+const metadata: Headers = new Headers();
 
 /**
  * Check if there is any metadata to apply.
@@ -33,8 +46,8 @@ const hasMetadata = (): boolean => {
         // TODO: remove this check once we're sure the feature works correctly in production
         return false;
     }
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     for (const _ of metadata) {
+        console.log(_);
         return true;
     }
     return false;
@@ -52,16 +65,14 @@ const hasMetadata = (): boolean => {
 const applyMetadata = (options: RequestInit): RequestInit | undefined => {
     if (hasMetadata()) {
         const augmentedOptions = Object.assign({}, options);
-        augmentedOptions.headers = new crossFetch.Headers(metadata);
+        augmentedOptions.headers = new Headers(metadata);
         if (options && options.headers) {
             // the Fetch spec says options.headers could be:
             // "A Headers object, an object literal, or an array of two-item arrays to set request's headers."
             // turn it into a Headers object to be sure of how to interact with it
-            const overrideHeaders = options.headers instanceof crossFetch.Headers ?
-                options.headers : new crossFetch.Headers(options.headers);
+            const overrideHeaders = options.headers instanceof Headers ?
+                options.headers : new Headers(options.headers);
             for (const [name, value] of overrideHeaders.entries()) {
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-expect-error
                 augmentedOptions.headers.set(name, value);
             }
         }
@@ -80,23 +91,23 @@ const applyMetadata = (options: RequestInit): RequestInit | undefined => {
  */
 const scratchFetch = (resource: RequestInfo | URL, options: RequestInit): Promise<Response> => {
     const augmentedOptions = applyMetadata(options);
-    return crossFetch(resource, augmentedOptions);
+    return fetch(resource, augmentedOptions);
 };
 
 /**
  * Set the value of a named request metadata item.
  * Setting the value to `null` or `undefined` will NOT remove the item.
  * Use `unsetMetadata` for that.
- * @param {RequestMetadata} name The name of the metadata item to set.
- * @param {any} value The value to set (will be converted to a string).
+ * @param {string} name The name of the metadata item to set.
+ * @param {string} value The value to set (will be converted to a string).
  */
-const setMetadata = (name: RequestMetadata, value: unknown) => {
+const setMetadata = (name: string, value: string) => {
     metadata.set(name, value);
 };
 
 /**
  * Remove a named request metadata item.
- * @param {RequestMetadata} name The name of the metadata item to remove.
+ * @param {string} name The name of the metadata item to remove.
  */
 const unsetMetadata = (name: string) => {
     metadata.delete(name);
@@ -105,28 +116,29 @@ const unsetMetadata = (name: string) => {
 /**
  * Retrieve a named request metadata item.
  * Only for use in tests. At the time of writing, used in scratch-vm tests.
- * @param {RequestMetadata} name The name of the metadata item to retrieve.
- * @returns {any} value The value of the metadata item, or `undefined` if it was not found.
+ * @param {string} name The name of the metadata item to retrieve.
+ * @returns {string | null} value The value of the metadata item, or `undefined` if it was not found.
  */
-const getMetadata = (name: string): unknown => metadata.get(name);
+const getMetadata = (name: string): string | null => metadata.get(name);
 
 const exportData = {
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-expect-error
-    Headers: crossFetch.Headers,
-    RequestMetadata: {
-        /** The ID of the project associated with this request */
-        ProjectId: 'X-Project-ID',
-        /** The ID of the project run associated with this request */
-        RunId: 'X-Run-ID'
-    },
+    Headers,
+    RequestMetadata,
     applyMetadata,
     scratchFetch,
     setMetadata,
     unsetMetadata,
     getMetadata
 };
+type ExportHeaders = Headers;
 
 export {
-    exportData as default
+    exportData as default,
+    ExportHeaders as Headers,
+    RequestMetadata,
+    applyMetadata,
+    scratchFetch,
+    setMetadata,
+    unsetMetadata,
+    getMetadata
 };

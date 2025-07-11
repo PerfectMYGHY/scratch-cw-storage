@@ -9,7 +9,7 @@ export {
      * Export for use with NPM & Node.js.
      * @type {ScratchStorage}
      */
-    ScratchStorage,
+    ScratchStorage as default,
 
     Asset,
     AssetId,

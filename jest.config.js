@@ -32,6 +32,8 @@ module.exports = {
                 ]
             }
         }).transform,
-        '\\.(png|svg|wav)$': '<rootDir>/test/transformers/arraybuffer-loader.js'
-    }
+        '\\.(png|svg|wav)$': '<rootDir>/test/transformers/arraybuffer-loader.js',
+        '^.+\\.worker\\.test\\.[jt]s$': 'worker-loader/jest-transform'
+    },
+    setupFilesAfterEnv: ['jest-extended/all'], // 引入所有扩展断言
 };

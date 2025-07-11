@@ -42,11 +42,6 @@ export default class WebHelper extends Helper {
 
         /**
          * @type {Array.<StoreRecord>}
-         * @typedef {object} StoreRecord
-         * @property {Array.<string>} types - The types of asset provided by this store, from AssetType's name field.
-         * @property {UrlFunction} getFunction - A function which computes a URL from an Asset.
-         * @property {UrlFunction} createFunction - A function which computes a URL from an Asset.
-         * @property {UrlFunction} updateFunction - A function which computes a URL from an Asset.
          */
         this.stores = [];
 
@@ -55,7 +50,7 @@ export default class WebHelper extends Helper {
          * cannot be used, it will use the next.
          * @type {ProxyTool}
          */
-        this.assetTool = new ProxyTool();
+        this.assetTool = new ProxyTool(parent);
 
         /**
          * Set of tools to best load project data in parallel with assets. This
@@ -63,7 +58,7 @@ export default class WebHelper extends Helper {
          * to initialize before they can load files.
          * @type {ProxyTool}
          */
-        this.projectTool = new ProxyTool(ProxyTool.TOOL_FILTER.READY);
+        this.projectTool = new ProxyTool(parent, ProxyTool.TOOL_FILTER.READY);
     }
 
     /**
@@ -199,7 +194,18 @@ export default class WebHelper extends Helper {
             // feel safe to do.
             create ? store.create!(asset) : store.update!(asset)
         );
+        console.log('send');
         const reqBodyConfig = Object.assign({body: data, method}, reqConfig);
+        console.log(reqConfig);
+        console.log(this.stores);
+        console.log(this.stores.filter(s =>
+            // Only use stores for the incoming asset type
+            s.types.indexOf(assetType.name) !== -1 && (
+                // Only use stores that have a create function if this is a create request
+                // or an update function if this is an update request
+                (create && s.create) || s.update
+            )
+        ));
         return tool.send(reqBodyConfig)
             .then(body => {
                 // xhr makes it difficult to both send FormData and

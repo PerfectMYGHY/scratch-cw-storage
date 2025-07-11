@@ -1,10 +1,15 @@
 import {Headers, applyMetadata} from './scratchFetch';
 import {ScratchGetRequest, Tool} from './Tool';
+import {assetHosts, assetFrom} from './AssetsHostInfo';
+import BatchLoadManager from './BatchLoadManager';
 
 interface DeferredJob {
     id: string,
     resolve: (buffer: ArrayBuffer) => void;
     reject: (error: unknown) => void;
+    assetHostId: number;
+    url: string;
+    options?: RequestInit;
 }
 
 /**
@@ -15,6 +20,9 @@ class PrivateFetchWorkerTool implements Tool {
     private _supportError: unknown;
     private worker: Worker | null;
     private jobs: Record<string, DeferredJob | undefined>;
+    private assetHosts: string[];
+    private assetFrom: string;
+    private manager: BatchLoadManager;
 
     constructor () {
         /**
@@ -43,6 +51,24 @@ class PrivateFetchWorkerTool implements Tool {
          */
         this.jobs = {};
 
+        /**
+         * 资源主机列表
+         * @type {string[]}
+         */
+        this.assetHosts = assetHosts;
+
+        /**
+         * 资源原本主机（用于替换）
+         * @type {string}
+         */
+        this.assetFrom = assetFrom;
+
+        /**
+         * 分批加载管理器
+         * @type {BatchLoadManager}
+         */
+        this.manager = new BatchLoadManager();
+
         try {
             if (this.isGetSupported) {
                 // Yes, this is a browser API and we've specified `browser: false` in the eslint env,
@@ -50,7 +76,7 @@ class PrivateFetchWorkerTool implements Tool {
                 // Also see https://webpack.js.org/guides/web-workers/
                 // eslint-disable-next-line no-undef
                 const worker = new Worker(
-                    /* webpackChunkName: "fetch-worker" */ new URL('./FetchWorkerTool.worker', import.meta.url)
+                    /* webpackChunkName: 'fetch-worker' */ new URL('./FetchWorkerTool.worker', import.meta.url)
                 );
 
                 worker.addEventListener('message', ({data}) => {
@@ -62,7 +88,17 @@ class PrivateFetchWorkerTool implements Tool {
                         const job = this.jobs[message.id];
                         if (job) {
                             if (message.error) {
-                                job.reject(message.error);
+                                if (job.assetHostId < this.assetHosts.length) {
+                                    job.assetHostId += 1;
+                                    worker.postMessage({
+                                        id: job.id,
+                                        url: job.url.replace(this.assetFrom, this.assetHosts[job.assetHostId - 1]),
+                                        options: {}
+                                    });
+                                    continue;
+                                } else {
+                                    job.reject(message.error);
+                                }
                             } else {
                                 job.resolve(message.buffer);
                             }
@@ -107,7 +143,7 @@ class PrivateFetchWorkerTool implements Tool {
             return Promise.reject(new Error('The worker could not be initialized'));
         }
 
-        return new Promise<ArrayBuffer>((resolve, reject) => {
+        return this.manager.addTask(() => new Promise<ArrayBuffer>((resolve, reject) => {
             // TODO: Use a Scratch standard ID generator ...
             const id = Math.random().toString(16)
                 .substring(2);
@@ -115,26 +151,34 @@ class PrivateFetchWorkerTool implements Tool {
                 Object.assign({method: 'GET'}, options)
             );
             // the Fetch spec says options.headers could be:
-            // "A Headers object, an object literal, or an array of two-item arrays to set request's headers."
+            // 'A Headers object, an object literal, or an array of two-item arrays to set request's headers.'
             // structured clone (postMessage) doesn't support Headers objects
             // so turn it into an array of two-item arrays to make it to the worker intact
             if (augmentedOptions && augmentedOptions.headers instanceof Headers) {
                 augmentedOptions.headers = Array.from(augmentedOptions.headers.entries());
             }
 
+            let assetHostId = 1;
+            if (this.jobs[id]) {
+                assetHostId = this.jobs[id].assetHostId + 1;
+            }
+
             worker.postMessage({
                 id,
-                url,
-                options: augmentedOptions
+                url: url.replace(this.assetFrom, this.assetHosts[assetHostId - 1]),
+                options: {}
             });
             this.jobs[id] = {
                 id,
                 resolve,
-                reject
+                reject,
+                assetHostId,
+                url,
+                options: augmentedOptions
             };
         })
-            /* eslint no-confusing-arrow: ["error", {"allowParens": true}] */
-            .then(body => (body ? new Uint8Array(body) : null));
+            /* eslint no-confusing-arrow: ['error', {'allowParens': true}] */
+            .then(body => (body ? new Uint8Array(body) : null)));
     }
 
     /**
