@@ -12,8 +12,5 @@ npm-*
 # IDEA
 /.idea
 
-# Build
-/dist
-
 # Visual Studio
 /.vs
