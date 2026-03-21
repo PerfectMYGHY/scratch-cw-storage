@@ -80,6 +80,9 @@ const applyMetadata = (options: RequestInit): RequestInit | undefined => {
         }
         return augmentedOptions;
     }
+    options = Object.assign({
+        credentials: 'include'
+    }, options);
     return options;
 };
 

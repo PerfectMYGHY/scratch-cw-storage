@@ -21494,7 +21494,9 @@ const hasMetadata = () => {
  */
 const applyMetadata = options => {
   if (hasMetadata()) {
-    const augmentedOptions = Object.assign({}, options);
+    const augmentedOptions = Object.assign({
+      credentials: 'include'
+    }, options);
     augmentedOptions.headers = new Headers(metadata);
     if (options && options.headers) {
       // the Fetch spec says options.headers could be:
@@ -21507,6 +21509,9 @@ const applyMetadata = options => {
     }
     return augmentedOptions;
   }
+  options = Object.assign({
+    credentials: 'include'
+  }, options);
   return options;
 };
 /**
