@@ -64,7 +64,9 @@ const hasMetadata = (): boolean => {
  */
 const applyMetadata = (options: RequestInit): RequestInit | undefined => {
     if (hasMetadata()) {
-        const augmentedOptions = Object.assign({}, options);
+        const augmentedOptions = Object.assign({
+            credentials: 'include'
+        }, options);
         augmentedOptions.headers = new Headers(metadata);
         if (options && options.headers) {
             // the Fetch spec says options.headers could be:
