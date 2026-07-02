@@ -1,14 +1,4 @@
-(function webpackUniversalModuleDefinition(root, factory) {
-	if(typeof exports === 'object' && typeof module === 'object')
-		module.exports = factory();
-	else if(typeof define === 'function' && define.amd)
-		define([], factory);
-	else if(typeof exports === 'object')
-		exports["ScratchStorage"] = factory();
-	else
-		root["ScratchStorage"] = factory();
-})(self, () => {
-return /******/ (() => { // webpackBootstrap
+/******/ (() => { // webpackBootstrap
 /******/ 	var __webpack_modules__ = ({
 
 /***/ 945:
@@ -785,9 +775,7 @@ const registerStep = function registerStep() {
  * @param {object} options.job A job id, url, and options descriptor to perform.
  */
 const onMessage = _ref => {
-  let {
-    data: job
-  } = _ref;
+  let job = _ref.data;
   if (jobsActive === 0 && !intervalId) {
     registerStep();
   }
@@ -812,8 +800,7 @@ postMessage({
   }
 });
 self.addEventListener('message', onMessage);
-/******/ 	return __webpack_exports__;
+module.exports = __webpack_exports__;
 /******/ })()
 ;
-});
-//# sourceMappingURL=fetch-worker.7a0adc94df277ffeb963.js.map
+//# sourceMappingURL=fetch-worker.36d56ebb9d0f372cc2f3.js.map

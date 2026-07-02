@@ -1,10 +1,10 @@
 @echo off
 
-echo ���ڸ���...
+echo 正在复制...
 
-xcopy .\dist ..\scratch-gui\node_modules\scratch-storage\dist /s /e /h /y
+REM xcopy .\dist ..\scratch-gui\node_modules\scratch-storage\dist /s /e /h /y
 
-xcopy .\dist ..\scratch-gui\node_modules\scratch-vm\node_modules\scratch-storage\dist /s /e /h /y
+REM xcopy .\dist ..\scratch-gui\node_modules\scratch-vm\node_modules\scratch-storage\dist /s /e /h /y
 
-echo ������ϣ�
+echo 复制成功
 

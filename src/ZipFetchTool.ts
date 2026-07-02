@@ -1,7 +1,7 @@
 /**
  * 分段压缩资源获取工具
  * @description 向服务器发送准备请求资源请求。当服务器响应一个URL可以获取ZIP分段时，即可下载ZIP并解压得到资源
- * @author 郭泓毅
+ * @author PerfectMYGHY
  */
 import {ScratchSendRequest} from './Tool';
 
@@ -70,7 +70,6 @@ class ZipFetchTool {
     }
 
     private getZipListFromAssets (assets: string[]): Promise<ZipList> {
-        console.debug('开始获取分段压缩列表！');
         if (isEqual(this.assetsToZipList, assets) && this.currentZipList !== null) {
             return new Promise(resolve => resolve(this.currentZipList as ZipList));
         }
@@ -106,7 +105,6 @@ class ZipFetchTool {
     }
 
     private async getAssetData (zipList: ZipList, asset: string): Promise<Uint8Array> {
-        console.debug('开始获取资源数据！', asset);
         let zipUrl: string | null = null;
         for (const [url, assets] of Object.entries(zipList)) {
             if (assets.includes(asset)) {
@@ -166,24 +164,16 @@ class ZipFetchTool {
     }
 
     get ({asset, ...options}: StorageRequest): Promise<Uint8Array> {
-        console.log('ZipFetchTool!');
-        console.log('环境检查：');
-        console.log('storage:', this.storage);
-        console.log('asset:', asset);
-        console.log('options:', options);
         if (options.url && options.url.includes('backpack')) {
-            console.error('!!!Don\'t support backpack!!!');
             return new Promise((resolve, reject) => {
                 reject(new Error('ZipFetchTool只适合处理项目资源加速加载！不支持背包素材！'));
             });
         } else if (!(options.url && options.url.includes('asset'))) {
-            console.error('!!!Don\'t support other asset!!!');
             return new Promise((resolve, reject) => {
                 reject(new Error('ZipFetchTool只适合处理项目资源加速加载！当前素材类型不支持加载！'));
             });
         }
         if (this.storage === null || asset === null) {
-            console.error('!!!No Storage Or Asset ID!!!');
             return new Promise((resolve, reject) => {
                 reject(new Error('ZipFetchTool加载素材时缺少Storage或Asset ID！请使用恰当的Store！'));
             });
@@ -203,7 +193,6 @@ class ZipFetchTool {
             }
         });
         return new Promise((resolve, reject) => {
-            console.debug('开始等待资源列表准备完毕！');
             waitAssetsOK
                 .then(() => this.getZipListFromAssets(this.storage.getCurrentProjectAssets() as string[]))
                 .then(zipList => this.getAssetData(zipList, asset))
@@ -252,13 +241,10 @@ class ZipFetchTool {
     private _getSendZipListFromAssets (
         assets: Array<AssetInfo | string>
     ): Promise<ZipSendList> {
-        console.debug('============开始生成Zip发送列表！');
         const zipSendList: ZipSendList = new Map<JSZip, string[]>();
         const cache: { name: string; data: Uint8Array }[] = [];
         let currentSize = 0;
         const MAX_SIZE = 7.875 * 1024 * 1024; // 7.875 MB
-
-        console.log(assets);
 
         for (const {data, assetName} of assets as AssetInfo[]) {
             let assetData: Uint8Array;
@@ -319,49 +305,9 @@ class ZipFetchTool {
     }
 
     async _upload (zipSendList: ZipSendList): Promise<void> {
-        console.debug('开始上传ZIP分段！');
         const errors: ErrorMap = new Map<string, Error>();
-        // const uploaders: Promise<void>[] = [];
         this.zipUploadingEvents.off('uploadedZip');
         for (const [zip, assetNames] of zipSendList.entries()) {
-            // const uploader = async () => {
-            //     try {
-            //         const zipBlob = await zip.generateAsync({type: 'blob'});
-            //         const response = await scratchFetch(this.getZipUploaderUrl, {
-            //             method: 'POST',
-            //             body: zipBlob
-            //         });
-            //
-            //         if (!response.ok) {
-            //             throw new Error(`上传失败，状态码：${response.status}`);
-            //         }
-            //
-            //         const data: {state: string, not_uploaded?: string[]} = await response.json();
-            //
-            //         if (data.state === 'successfully') {
-            //             this.zipUploadedAssets.push(...assetNames);
-            //             this.zipUploadingEvents.emit('uploadedZip');
-            //             console.debug(`成功上传ZIP分段，包含资源：${assetNames.join(', ')}`);
-            //         } else if (data.state === 'failed' && data.not_uploaded) {
-            //             console.error('上传出错！上传失败列表：');
-            //             console.error(data.not_uploaded);
-            //             // 1. 将数组b转换为Set
-            //             const notUploaded: Set<string> = new Set(data.not_uploaded as string[]);
-            //             // 2. 过滤a中不属于b的元素
-            //             const updatedAssets = assetNames.filter(item => !notUploaded.has(item));
-            //             this.zipUploadedAssets.push(...updatedAssets);
-            //             this.zipUploadingEvents.emit('uploadedZip');
-            //             console.error('=========上面的数组中的资源将使用默认方法上传，接下来的数据仍使用当前上传器=========');
-            //             for (const asset of notUploaded) {
-            //                 errors.set(asset, new Error(`上传资源${asset}失败！`));
-            //             }
-            //         }
-            //     } catch (error) {
-            //         console.error('上传ZIP分段时出错：', error);
-            //         throw error;
-            //     }
-            // };
-            // uploaders.push(uploader());
             try {
                 const zipBlob = await zip.generateAsync({type: 'blob'});
                 const response = await scratchFetch(this.getZipUploaderUrl, {
@@ -378,7 +324,6 @@ class ZipFetchTool {
                 if (data.state === 'successfully') {
                     this.zipUploadedAssets.push(...assetNames);
                     this.zipUploadingEvents.emit('uploadedZip');
-                    console.debug(`成功上传ZIP分段，包含资源：${assetNames.join(', ')}`);
                 } else if (data.state === 'failed' && data.not_uploaded) {
                     console.error('上传出错！上传失败列表：');
                     console.error(data.not_uploaded);
@@ -398,22 +343,10 @@ class ZipFetchTool {
                 throw error;
             }
         }
-        // console.log('上传请求开始发送！');
-        // await Promise.all(uploaders).catch(err => {
-        //     console.error(err);
-        // });
-        // console.log('上传请求发送完毕！');
         this.zipUploader = null;
-        if (Object.keys(errors).length > 0) {
+        if (errors.size > 0) {
             throw errors;
         }
-        // const allWaiter = Promise.all(uploaders);
-        // return allWaiter.then(() => {
-        //     this.zipUploader = null;
-        //     if (Object.keys(errors).length > 0) {
-        //         return Promise.reject(errors);
-        //     }
-        // });
     }
 
     /**
@@ -426,25 +359,6 @@ class ZipFetchTool {
         if (!this.zipUploader) {
             this.zipUploader = this._upload(zipSendList);
         }
-        // return new Promise((resolve, reject) => {
-        //     let uploaded = false;
-        //     this.zipUploadingEvents.on('uploadedZip', () => {
-        //         if (this.zipUploadedAssets.includes(asset)) {
-        //             uploaded = true;
-        //             resolve(JSON.stringify({
-        //                 'status': 'ok',
-        //                 'content-name': asset
-        //             }));
-        //         }
-        //     });
-        //     this.zipUploader?.catch((err: ErrorMap) => {
-        //         if (!uploaded && err.has(asset)) {
-        //             console.error('上传出错：');
-        //             console.error(err.get(asset));
-        //             reject(err.get(asset));
-        //         }
-        //     });
-        // });
         return this.zipUploader.then(() => JSON.stringify({
             'status': 'ok',
             'content-name': asset
@@ -456,24 +370,16 @@ class ZipFetchTool {
     }
 
     send ({asset, ...options}: ScratchSendRequest): Promise<string> {
-        console.log('ZipFetchTool!');
-        console.log('环境检查：');
-        console.log('storage:', this.storage);
-        console.log('asset:', asset);
-        console.log('options:', options);
         if ((options.url && options.url.includes('backpack')) || this.storage.currentAssetFrom === 'backpack') {
-            console.error('!!!Don\'t support backpack!!!');
             return new Promise((resolve, reject) => {
                 reject(new Error('ZipFetchTool只适合处理项目资源加速加载！不支持背包素材！'));
             });
         } else if (!(options.url && options.url.includes('asset')) || this.storage.currentAssetFrom !== 'asset') {
-            console.error('!!!Don\'t support other asset!!!');
             return new Promise((resolve, reject) => {
                 reject(new Error('ZipFetchTool只适合处理项目资源加速加载！当前素材类型不支持加载！'));
             });
         }
         if (asset === null) {
-            console.error('!!!No Storage Or Asset ID!!!');
             return new Promise((resolve, reject) => {
                 reject(new Error('ZipFetchTool加载素材时缺少Storage或Asset ID！请使用恰当的Store！'));
             });
@@ -493,14 +399,12 @@ class ZipFetchTool {
             }
         });
         return new Promise((resolve, reject) => {
-            console.debug('开始等待资源列表准备完毕！');
             waitAssetsOK
                 .then(() => this.getSendZipListFromAssets(this.storage.getCurrentProjectAssets()))
                 .then(zipSendList => this.uploadAndWait(zipSendList, asset))
                 .then(result => resolve(result))
                 .catch(err => {
                     global.ScratchStorage_onZipFetchToolError.emit('failed');
-                    console.error(err);
                     reject(err);
                 });
         });

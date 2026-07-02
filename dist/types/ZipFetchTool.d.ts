@@ -1,7 +1,7 @@
 /**
  * 分段压缩资源获取工具
  * @description 向服务器发送准备请求资源请求。当服务器响应一个URL可以获取ZIP分段时，即可下载ZIP并解压得到资源
- * @author 郭泓毅
+ * @author PerfectMYGHY
  */
 import { ScratchSendRequest } from './Tool';
 import JSZip from 'jszip';

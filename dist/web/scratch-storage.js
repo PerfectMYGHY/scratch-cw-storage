@@ -3452,7 +3452,7 @@ var __WEBPACK_AMD_DEFINE_RESULT__;/**
   var undefined;
 
   /** Used as the semantic version number. */
-  var VERSION = '4.17.21';
+  var VERSION = '4.18.1';
 
   /** Used as the size to enable large array optimizations. */
   var LARGE_ARRAY_SIZE = 200;
@@ -3460,7 +3460,8 @@ var __WEBPACK_AMD_DEFINE_RESULT__;/**
   /** Error message constants. */
   var CORE_ERROR_TEXT = 'Unsupported core-js use. Try https://npms.io/search?q=ponyfill.',
       FUNC_ERROR_TEXT = 'Expected a function',
-      INVALID_TEMPL_VAR_ERROR_TEXT = 'Invalid `variable` option passed into `_.template`';
+      INVALID_TEMPL_VAR_ERROR_TEXT = 'Invalid `variable` option passed into `_.template`',
+      INVALID_TEMPL_IMPORTS_ERROR_TEXT = 'Invalid `imports` option passed into `_.template`';
 
   /** Used to stand-in for `undefined` hash values. */
   var HASH_UNDEFINED = '__lodash_hash_undefined__';
@@ -5192,6 +5193,10 @@ var __WEBPACK_AMD_DEFINE_RESULT__;/**
      * embedded Ruby (ERB) as well as ES2015 template strings. Change the
      * following template settings to use alternative delimiters.
      *
+     * **Security:** See
+     * [threat model](https://github.com/lodash/lodash/blob/main/threat-model.md)
+     * — `_.template` is insecure and will be removed in v5.
+     *
      * @static
      * @memberOf _
      * @type {Object}
@@ -5740,7 +5745,7 @@ var __WEBPACK_AMD_DEFINE_RESULT__;/**
      * @name has
      * @memberOf SetCache
      * @param {*} value The value to search for.
-     * @returns {number} Returns `true` if `value` is found, else `false`.
+     * @returns {boolean} Returns `true` if `value` is found, else `false`.
      */
     function setCacheHas(value) {
       return this.__data__.has(value);
@@ -7206,7 +7211,7 @@ var __WEBPACK_AMD_DEFINE_RESULT__;/**
           if (isArray(iteratee)) {
             return function(value) {
               return baseGet(value, iteratee.length === 1 ? iteratee[0] : iteratee);
-            }
+            };
           }
           return iteratee;
         });
@@ -7810,8 +7815,34 @@ var __WEBPACK_AMD_DEFINE_RESULT__;/**
      */
     function baseUnset(object, path) {
       path = castPath(path, object);
-      object = parent(object, path);
-      return object == null || delete object[toKey(last(path))];
+
+      // Prevent prototype pollution:
+      // https://github.com/lodash/lodash/security/advisories/GHSA-xxjr-mmjv-4gpg
+      // https://github.com/lodash/lodash/security/advisories/GHSA-f23m-r3pf-42rh
+      var index = -1,
+          length = path.length;
+
+      if (!length) {
+        return true;
+      }
+
+      while (++index < length) {
+        var key = toKey(path[index]);
+
+        // Always block "__proto__" anywhere in the path if it's not expected
+        if (key === '__proto__' && !hasOwnProperty.call(object, '__proto__')) {
+          return false;
+        }
+
+        // Block constructor/prototype as non-terminal traversal keys to prevent
+        // escaping the object graph into built-in constructors and prototypes.
+        if ((key === 'constructor' || key === 'prototype') && index < length - 1) {
+          return false;
+        }
+      }
+
+      var obj = parent(object, path);
+      return obj == null || delete obj[toKey(last(path))];
     }
 
     /**
@@ -10362,7 +10393,7 @@ var __WEBPACK_AMD_DEFINE_RESULT__;/**
 
     /**
      * Creates an array with all falsey values removed. The values `false`, `null`,
-     * `0`, `""`, `undefined`, and `NaN` are falsey.
+     * `0`, `-0`, `0n`, `""`, `undefined`, and `NaN` are falsy.
      *
      * @static
      * @memberOf _
@@ -10901,7 +10932,7 @@ var __WEBPACK_AMD_DEFINE_RESULT__;/**
 
       while (++index < length) {
         var pair = pairs[index];
-        result[pair[0]] = pair[1];
+        baseAssignValue(result, pair[0], pair[1]);
       }
       return result;
     }
@@ -17561,6 +17592,8 @@ var __WEBPACK_AMD_DEFINE_RESULT__;/**
      * **Note:** JavaScript follows the IEEE-754 standard for resolving
      * floating-point values which can produce unexpected results.
      *
+     * **Note:** If `lower` is greater than `upper`, the values are swapped.
+     *
      * @static
      * @memberOf _
      * @since 0.7.0
@@ -17574,8 +17607,15 @@ var __WEBPACK_AMD_DEFINE_RESULT__;/**
      * _.random(0, 5);
      * // => an integer between 0 and 5
      *
+     * // when lower is greater than upper the values are swapped
+     * _.random(5, 0);
+     * // => an integer between 0 and 5
+     *
      * _.random(5);
      * // => also an integer between 0 and 5
+     *
+     * _.random(-5);
+     * // => an integer between -5 and 0
      *
      * _.random(5, true);
      * // => a floating-point number between 0 and 5
@@ -18178,6 +18218,10 @@ var __WEBPACK_AMD_DEFINE_RESULT__;/**
      * properties may be accessed as free variables in the template. If a setting
      * object is given, it takes precedence over `_.templateSettings` values.
      *
+     * **Security:** `_.template` is insecure and should not be used. It will be
+     * removed in Lodash v5. Avoid untrusted input. See
+     * [threat model](https://github.com/lodash/lodash/blob/main/threat-model.md).
+     *
      * **Note:** In the development build `_.template` utilizes
      * [sourceURLs](http://www.html5rocks.com/en/tutorials/developertools/sourcemaps/#toc-sourceurl)
      * for easier debugging.
@@ -18285,11 +18329,17 @@ var __WEBPACK_AMD_DEFINE_RESULT__;/**
         options = undefined;
       }
       string = toString(string);
-      options = assignInWith({}, options, settings, customDefaultsAssignIn);
+      options = assignWith({}, options, settings, customDefaultsAssignIn);
 
-      var imports = assignInWith({}, options.imports, settings.imports, customDefaultsAssignIn),
+      var imports = assignWith({}, options.imports, settings.imports, customDefaultsAssignIn),
           importsKeys = keys(imports),
           importsValues = baseValues(imports, importsKeys);
+
+      arrayEach(importsKeys, function(key) {
+        if (reForbiddenIdentifierChars.test(key)) {
+          throw new Error(INVALID_TEMPL_IMPORTS_ERROR_TEXT);
+        }
+      });
 
       var isEscaping,
           isEvaluating,
@@ -20967,7 +21017,7 @@ module.exports = __webpack_require__(14)("PD94bWwgdmVyc2lvbj0iMS4wIj8+Cjxzdmcgd2
 /******/ 		// This function allow to reference async chunks
 /******/ 		__webpack_require__.u = (chunkId) => {
 /******/ 			// return url for filenames based on template
-/******/ 			return "chunks/" + "fetch-worker" + "." + "7a0adc94df277ffeb963" + ".js";
+/******/ 			return "chunks/" + "fetch-worker" + "." + "c49d71b18e7ef6172a8c" + ".js";
 /******/ 		};
 /******/ 	})();
 /******/ 	
@@ -21114,9 +21164,7 @@ const memoizedToString = function () {
             fromCharCode[i] = String.fromCharCode(i);
           }
         }
-        const {
-          length
-        } = data;
+        const length = data.length;
         let s = '';
         // Iterate over chunks of the binary data.
         for (let i = 0, e = 0; i < length; i = e) {
@@ -21449,6 +21497,12 @@ class BuiltinHelper extends Helper {
   }
 }
 ;// ./src/scratchFetch.ts
+function _slicedToArray(r, e) { return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest(); }
+function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
+function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
+function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length); for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e]; return n; }
+function _iterableToArrayLimit(r, l) { var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (null != t) { var e, n, i, u, a = [], f = !0, o = !1; try { if (i = (t = t.call(r)).next, 0 === l) { if (Object(t) !== t) return; f = !1; } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0); } catch (r) { o = !0, n = r; } finally { try { if (!f && null != t.return && (u = t.return(), Object(u) !== u)) return; } finally { if (o) throw n; } } return a; } }
+function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
 /**
  * Metadata header names
  * @enum {string} The enum value is the name of the associated header.
@@ -21503,7 +21557,10 @@ const applyMetadata = options => {
       // "A Headers object, an object literal, or an array of two-item arrays to set request's headers."
       // turn it into a Headers object to be sure of how to interact with it
       const overrideHeaders = options.headers instanceof Headers ? options.headers : new Headers(options.headers);
-      for (const [name, value] of overrideHeaders.entries()) {
+      for (const _ref of overrideHeaders.entries()) {
+        var _ref2 = _slicedToArray(_ref, 2);
+        const name = _ref2[0];
+        const value = _ref2[1];
         augmentedOptions.headers.set(name, value);
       }
     }
@@ -21674,11 +21731,10 @@ class BatchLoadManager {
     if (this.running_tasks.size < this.batchSize && this.queue.length !== 0) {
       task = this.queue.shift();
       if (task) {
-        const {
-          fetcherGetter,
-          resolve,
-          reject
-        } = task;
+        const _task = task,
+          fetcherGetter = _task.fetcherGetter,
+          resolve = _task.resolve,
+          reject = _task.reject;
         this.running_tasks.set(fetcherGetter, {
           fetcherGetter,
           status: 'running',
@@ -21818,9 +21874,7 @@ class PrivateFetchWorkerTool {
         // eslint-disable-next-line no-undef
         const worker = new Worker(/* webpackChunkName: 'fetch-worker' */new URL(/* worker import */ __webpack_require__.p + __webpack_require__.u(836), __webpack_require__.b));
         worker.addEventListener('message', _ref => {
-          let {
-            data
-          } = _ref;
+          let data = _ref.data;
           if (data.support) {
             this._workerSupport = data.support;
             return;
@@ -21871,9 +21925,7 @@ class PrivateFetchWorkerTool {
    * @returns {Promise.<Buffer|Uint8Array|null>} Resolve to Buffer of data from server.
    */
   get(_ref2) {
-    let {
-        url
-      } = _ref2,
+    let url = _ref2.url,
       options = _objectWithoutProperties(_ref2, _excluded);
     const worker = this.worker;
     if (!worker) {
@@ -22022,9 +22074,7 @@ class FetchTool {
    * @returns {Promise.<Uint8Array?>} Resolve to Buffer of data from server.
    */
   get(_ref) {
-    let {
-        url
-      } = _ref,
+    let url = _ref.url,
       options = FetchTool_objectWithoutProperties(_ref, FetchTool_excluded);
     const request = (times, resolve, reject) => scratchFetch(url.replace(this.assetFrom, this.assetHosts[times]), Object.assign({
       method: 'GET'
@@ -22064,10 +22114,9 @@ class FetchTool {
    * @returns {Promise.<string>} Server returned metadata.
    */
   send(_ref2) {
-    let {
-        url,
-        withCredentials = false
-      } = _ref2,
+    let url = _ref2.url,
+      _ref2$withCredentials = _ref2.withCredentials,
+      withCredentials = _ref2$withCredentials === void 0 ? false : _ref2$withCredentials,
       options = FetchTool_objectWithoutProperties(_ref2, _excluded2);
     return scratchFetch(url, Object.assign({
       credentials: withCredentials ? 'include' : 'omit'
@@ -22087,6 +22136,12 @@ const ZipFetchTool_excluded = ["asset"],
   ZipFetchTool_excluded2 = ["asset"];
 function ZipFetchTool_objectWithoutProperties(e, t) { if (null == e) return {}; var o, r, i = ZipFetchTool_objectWithoutPropertiesLoose(e, t); if (Object.getOwnPropertySymbols) { var n = Object.getOwnPropertySymbols(e); for (r = 0; r < n.length; r++) o = n[r], -1 === t.indexOf(o) && {}.propertyIsEnumerable.call(e, o) && (i[o] = e[o]); } return i; }
 function ZipFetchTool_objectWithoutPropertiesLoose(r, e) { if (null == r) return {}; var t = {}; for (var n in r) if ({}.hasOwnProperty.call(r, n)) { if (-1 !== e.indexOf(n)) continue; t[n] = r[n]; } return t; }
+function ZipFetchTool_slicedToArray(r, e) { return ZipFetchTool_arrayWithHoles(r) || ZipFetchTool_iterableToArrayLimit(r, e) || ZipFetchTool_unsupportedIterableToArray(r, e) || ZipFetchTool_nonIterableRest(); }
+function ZipFetchTool_nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
+function ZipFetchTool_unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return ZipFetchTool_arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? ZipFetchTool_arrayLikeToArray(r, a) : void 0; } }
+function ZipFetchTool_arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length); for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e]; return n; }
+function ZipFetchTool_iterableToArrayLimit(r, l) { var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (null != t) { var e, n, i, u, a = [], f = !0, o = !1; try { if (i = (t = t.call(r)).next, 0 === l) { if (Object(t) !== t) return; f = !1; } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0); } catch (r) { o = !0, n = r; } finally { try { if (!f && null != t.return && (u = t.return(), Object(u) !== u)) return; } finally { if (o) throw n; } } return a; } }
+function ZipFetchTool_arrayWithHoles(r) { if (Array.isArray(r)) return r; }
 function ZipFetchTool_defineProperty(e, r, t) { return (r = ZipFetchTool_toPropertyKey(r)) in e ? Object.defineProperty(e, r, { value: t, enumerable: !0, configurable: !0, writable: !0 }) : e[r] = t, e; }
 function ZipFetchTool_toPropertyKey(t) { var i = ZipFetchTool_toPrimitive(t, "string"); return "symbol" == typeof i ? i : i + ""; }
 function ZipFetchTool_toPrimitive(t, r) { if ("object" != typeof t || !t) return t; var e = t[Symbol.toPrimitive]; if (void 0 !== e) { var i = e.call(t, r || "default"); if ("object" != typeof i) return i; throw new TypeError("@@toPrimitive must return a primitive value."); } return ("string" === r ? String : Number)(t); }
@@ -22134,7 +22189,6 @@ class ZipFetchTool {
     return "".concat(this.assetURL, "/zip/list/generator/");
   }
   getZipListFromAssets(assets) {
-    console.debug('开始获取分段压缩列表！');
     if ((0,lodash.isEqual)(this.assetsToZipList, assets) && this.currentZipList !== null) {
       return new Promise(resolve => resolve(this.currentZipList));
     }
@@ -22160,9 +22214,11 @@ class ZipFetchTool {
     });
   }
   async getAssetData(zipList, asset) {
-    console.debug('开始获取资源数据！', asset);
     let zipUrl = null;
-    for (const [url, assets] of Object.entries(zipList)) {
+    for (const _ref of Object.entries(zipList)) {
+      var _ref2 = ZipFetchTool_slicedToArray(_ref, 2);
+      const url = _ref2[0];
+      const assets = _ref2[1];
       if (assets.includes(asset)) {
         zipUrl = url;
         break;
@@ -22214,29 +22270,19 @@ class ZipFetchTool {
       return Promise.reject(error);
     }
   }
-  get(_ref) {
-    let {
-        asset
-      } = _ref,
-      options = ZipFetchTool_objectWithoutProperties(_ref, ZipFetchTool_excluded);
-    console.log('ZipFetchTool!');
-    console.log('环境检查：');
-    console.log('storage:', this.storage);
-    console.log('asset:', asset);
-    console.log('options:', options);
+  get(_ref3) {
+    let asset = _ref3.asset,
+      options = ZipFetchTool_objectWithoutProperties(_ref3, ZipFetchTool_excluded);
     if (options.url && options.url.includes('backpack')) {
-      console.error('!!!Don\'t support backpack!!!');
       return new Promise((resolve, reject) => {
         reject(new Error('ZipFetchTool只适合处理项目资源加速加载！不支持背包素材！'));
       });
     } else if (!(options.url && options.url.includes('asset'))) {
-      console.error('!!!Don\'t support other asset!!!');
       return new Promise((resolve, reject) => {
         reject(new Error('ZipFetchTool只适合处理项目资源加速加载！当前素材类型不支持加载！'));
       });
     }
     if (this.storage === null || asset === null) {
-      console.error('!!!No Storage Or Asset ID!!!');
       return new Promise((resolve, reject) => {
         reject(new Error('ZipFetchTool加载素材时缺少Storage或Asset ID！请使用恰当的Store！'));
       });
@@ -22255,7 +22301,6 @@ class ZipFetchTool {
       }
     });
     return new Promise((resolve, reject) => {
-      console.debug('开始等待资源列表准备完毕！');
       waitAssetsOK.then(() => this.getZipListFromAssets(this.storage.getCurrentProjectAssets())).then(zipList => this.getAssetData(zipList, asset)).then(data => resolve(data)).catch(err => {
         __webpack_require__.g.ScratchStorage_onZipFetchToolError.emit('failed');
         console.error(err);
@@ -22294,16 +22339,13 @@ class ZipFetchTool {
    * @returns {Promise<ZipSendList>} 生成的Zip发送列表
    */
   _getSendZipListFromAssets(assets) {
-    console.debug('============开始生成Zip发送列表！');
     const zipSendList = new Map();
     const cache = [];
     let currentSize = 0;
     const MAX_SIZE = 7.875 * 1024 * 1024; // 7.875 MB
-    console.log(assets);
-    for (const {
-      data,
-      assetName
-    } of assets) {
+    for (const _ref4 of assets) {
+      const data = _ref4.data;
+      const assetName = _ref4.assetName;
       let assetData;
       try {
         assetData = ZipFetchTool.toUint8Array(data);
@@ -22356,49 +22398,12 @@ class ZipFetchTool {
     return "".concat(this.assetURL, "/zip/uploader/");
   }
   async _upload(zipSendList) {
-    console.debug('开始上传ZIP分段！');
     const errors = new Map();
-    // const uploaders: Promise<void>[] = [];
     this.zipUploadingEvents.off('uploadedZip');
-    for (const [zip, assetNames] of zipSendList.entries()) {
-      // const uploader = async () => {
-      //     try {
-      //         const zipBlob = await zip.generateAsync({type: 'blob'});
-      //         const response = await scratchFetch(this.getZipUploaderUrl, {
-      //             method: 'POST',
-      //             body: zipBlob
-      //         });
-      //
-      //         if (!response.ok) {
-      //             throw new Error(`上传失败，状态码：${response.status}`);
-      //         }
-      //
-      //         const data: {state: string, not_uploaded?: string[]} = await response.json();
-      //
-      //         if (data.state === 'successfully') {
-      //             this.zipUploadedAssets.push(...assetNames);
-      //             this.zipUploadingEvents.emit('uploadedZip');
-      //             console.debug(`成功上传ZIP分段，包含资源：${assetNames.join(', ')}`);
-      //         } else if (data.state === 'failed' && data.not_uploaded) {
-      //             console.error('上传出错！上传失败列表：');
-      //             console.error(data.not_uploaded);
-      //             // 1. 将数组b转换为Set
-      //             const notUploaded: Set<string> = new Set(data.not_uploaded as string[]);
-      //             // 2. 过滤a中不属于b的元素
-      //             const updatedAssets = assetNames.filter(item => !notUploaded.has(item));
-      //             this.zipUploadedAssets.push(...updatedAssets);
-      //             this.zipUploadingEvents.emit('uploadedZip');
-      //             console.error('=========上面的数组中的资源将使用默认方法上传，接下来的数据仍使用当前上传器=========');
-      //             for (const asset of notUploaded) {
-      //                 errors.set(asset, new Error(`上传资源${asset}失败！`));
-      //             }
-      //         }
-      //     } catch (error) {
-      //         console.error('上传ZIP分段时出错：', error);
-      //         throw error;
-      //     }
-      // };
-      // uploaders.push(uploader());
+    for (const _ref5 of zipSendList.entries()) {
+      var _ref6 = ZipFetchTool_slicedToArray(_ref5, 2);
+      const zip = _ref6[0];
+      const assetNames = _ref6[1];
       try {
         const zipBlob = await zip.generateAsync({
           type: 'blob'
@@ -22414,7 +22419,6 @@ class ZipFetchTool {
         if (data.state === 'successfully') {
           this.zipUploadedAssets.push(...assetNames);
           this.zipUploadingEvents.emit('uploadedZip');
-          console.debug("\u6210\u529F\u4E0A\u4F20ZIP\u5206\u6BB5\uFF0C\u5305\u542B\u8D44\u6E90\uFF1A".concat(assetNames.join(', ')));
         } else if (data.state === 'failed' && data.not_uploaded) {
           console.error('上传出错！上传失败列表：');
           console.error(data.not_uploaded);
@@ -22434,22 +22438,10 @@ class ZipFetchTool {
         throw error;
       }
     }
-    // console.log('上传请求开始发送！');
-    // await Promise.all(uploaders).catch(err => {
-    //     console.error(err);
-    // });
-    // console.log('上传请求发送完毕！');
     this.zipUploader = null;
-    if (Object.keys(errors).length > 0) {
+    if (errors.size > 0) {
       throw errors;
     }
-    // const allWaiter = Promise.all(uploaders);
-    // return allWaiter.then(() => {
-    //     this.zipUploader = null;
-    //     if (Object.keys(errors).length > 0) {
-    //         return Promise.reject(errors);
-    //     }
-    // });
   }
   /**
    * 开启上传ZIP分段（如果未上传）并等待当前资源所在ZIP上传完毕。注意：不会等待所有ZIP分段上传完毕！
@@ -22461,25 +22453,6 @@ class ZipFetchTool {
     if (!this.zipUploader) {
       this.zipUploader = this._upload(zipSendList);
     }
-    // return new Promise((resolve, reject) => {
-    //     let uploaded = false;
-    //     this.zipUploadingEvents.on('uploadedZip', () => {
-    //         if (this.zipUploadedAssets.includes(asset)) {
-    //             uploaded = true;
-    //             resolve(JSON.stringify({
-    //                 'status': 'ok',
-    //                 'content-name': asset
-    //             }));
-    //         }
-    //     });
-    //     this.zipUploader?.catch((err: ErrorMap) => {
-    //         if (!uploaded && err.has(asset)) {
-    //             console.error('上传出错：');
-    //             console.error(err.get(asset));
-    //             reject(err.get(asset));
-    //         }
-    //     });
-    // });
     return this.zipUploader.then(() => JSON.stringify({
       'status': 'ok',
       'content-name': asset
@@ -22488,29 +22461,19 @@ class ZipFetchTool {
   get isSendSupported() {
     return true;
   }
-  send(_ref2) {
-    let {
-        asset
-      } = _ref2,
-      options = ZipFetchTool_objectWithoutProperties(_ref2, ZipFetchTool_excluded2);
-    console.log('ZipFetchTool!');
-    console.log('环境检查：');
-    console.log('storage:', this.storage);
-    console.log('asset:', asset);
-    console.log('options:', options);
+  send(_ref7) {
+    let asset = _ref7.asset,
+      options = ZipFetchTool_objectWithoutProperties(_ref7, ZipFetchTool_excluded2);
     if (options.url && options.url.includes('backpack') || this.storage.currentAssetFrom === 'backpack') {
-      console.error('!!!Don\'t support backpack!!!');
       return new Promise((resolve, reject) => {
         reject(new Error('ZipFetchTool只适合处理项目资源加速加载！不支持背包素材！'));
       });
     } else if (!(options.url && options.url.includes('asset')) || this.storage.currentAssetFrom !== 'asset') {
-      console.error('!!!Don\'t support other asset!!!');
       return new Promise((resolve, reject) => {
         reject(new Error('ZipFetchTool只适合处理项目资源加速加载！当前素材类型不支持加载！'));
       });
     }
     if (asset === null) {
-      console.error('!!!No Storage Or Asset ID!!!');
       return new Promise((resolve, reject) => {
         reject(new Error('ZipFetchTool加载素材时缺少Storage或Asset ID！请使用恰当的Store！'));
       });
@@ -22529,10 +22492,8 @@ class ZipFetchTool {
       }
     });
     return new Promise((resolve, reject) => {
-      console.debug('开始等待资源列表准备完毕！');
       waitAssetsOK.then(() => this.getSendZipListFromAssets(this.storage.getCurrentProjectAssets())).then(zipSendList => this.uploadAndWait(zipSendList, asset)).then(result => resolve(result)).catch(err => {
         __webpack_require__.g.ScratchStorage_onZipFetchToolError.emit('failed');
-        console.error(err);
         reject(err);
       });
     });
@@ -22843,7 +22804,7 @@ class ScratchStorage {
     this.currentProjectAssets = [];
     this.projectAssetsOK = false;
     this.eventEmitter = createEventEmitter();
-    this.assetHost = 'http://127.0.0.1:8006';
+    this.assetHost = 'https://assets1.scratch-cw.top';
     this.currentAssetFrom = 'asset';
   }
   /**

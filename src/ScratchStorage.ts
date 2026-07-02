@@ -49,7 +49,7 @@ export class ScratchStorage {
         this.currentProjectAssets = [];
         this.projectAssetsOK = false;
         this.eventEmitter = createEventEmitter();
-        this.assetHost = 'http://127.0.0.1:8006';
+        this.assetHost = 'https://assets1.scratch-cw.top';
         this.currentAssetFrom = 'asset';
     }
 

@@ -24,7 +24,9 @@
     "noImplicitAny": false,
 
     /* Completeness */
-    "skipLibCheck": true
+    "skipLibCheck": true,
+
+    "rootDir": "./src"
   },
     "types": ["node"]
 }
