@@ -3,12 +3,12 @@
  * @type {Array<string>}
  */
 const assetHosts: Array<string> = [
+    'https://assets6.scratch-cw.top',
     'https://assets1.scratch-cw.top',
     'https://assets2.scratch-cw.top',
     'https://assets3.scratch-cw.top',
     'https://assets4.scratch-cw.top',
-    'https://assets5.scratch-cw.top',
-    'https://assets6.scratch-cw.top'
+    'https://assets5.scratch-cw.top'
 ];
 
 /**

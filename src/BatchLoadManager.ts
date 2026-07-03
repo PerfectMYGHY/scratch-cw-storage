@@ -31,7 +31,7 @@ interface BatchLoadTask {
 
 /**
  * 分批加载管理器
- * @author 郭泓毅
+ * @author PerfectMYGHY
  * @description 管理分批加载任务
  * @see BatchLoadTask
  */
@@ -58,9 +58,9 @@ class BatchLoadManager {
 
     /**
      * 分批加载管理器构造函数
-     * @param batchSize 批次大小，默认为200
+     * @param {number} batchSize 批次大小，默认为50
      */
-    constructor(batchSize: number = 200) {
+    constructor (batchSize: number = 50) {
         /**
          * 等待执行任务队列
          */
@@ -84,9 +84,9 @@ class BatchLoadManager {
 
     /**
      * 执行步骤
-     * @param fetcherGetter 加载器获取器
+     * @param {FetcherGetter} fetcherGetter 加载器获取器
      */
-    private step(fetcherGetter: FetcherGetter) {
+    private step (fetcherGetter: FetcherGetter) {
         let task;
         if (this.running_tasks.size !== 0) {
             task = this.running_tasks.get(fetcherGetter);
@@ -98,6 +98,7 @@ class BatchLoadManager {
             task = this.queue.shift();
             if (task) {
                 const {
+                    // eslint-disable-next-line no-shadow
                     fetcherGetter,
                     resolve,
                     reject
@@ -105,16 +106,18 @@ class BatchLoadManager {
                 this.running_tasks.set(fetcherGetter, {
                     fetcherGetter,
                     status: 'running',
-                    fetcher: fetcherGetter().then((data) => {
+                    fetcher: fetcherGetter().then(data => {
                         this.step(fetcherGetter);
                         return data;
-                    }).then((data) => {
-                        resolve(data);
-                        return data;
-                    }).catch((err) => {
-                        reject(err);
-                        return null;
-                    }),
+                    })
+                        .then(data => {
+                            resolve(data);
+                            return data;
+                        })
+                        .catch(err => {
+                            reject(err);
+                            return null;
+                        }),
                     resolve,
                     reject
                 });
@@ -125,46 +128,48 @@ class BatchLoadManager {
 
     /**
      * 添加任务
-     * @param fetcherGetter 加载器获取器
-     * @returns 等待器，等待任务完成并返回任务的返回值
+     * @param {FetcherGetter} fetcherGetter 加载器获取器
+     * @returns {Promise<Uint8Array | null>} 等待器，等待任务完成并返回任务的返回值
      */
-    public addTask(fetcherGetter: FetcherGetter) {
+    public addTask (fetcherGetter: FetcherGetter): Promise<Uint8Array | null> {
         const waiter: Waiter = (resolve, reject) => {
             if (this.running_tasks.size < this.batchSize) {
                 this.running_tasks.set(fetcherGetter, {
                     fetcherGetter,
-                    fetcher: fetcherGetter().then((data) => {
+                    fetcher: fetcherGetter().then(data => {
                         this.step(fetcherGetter);
                         return data;
-                    }).then((data) => {
-                        resolve(data);
-                        return data;
-                    }).catch((err) => {
-                        reject(err);
-                        return null;
-                    }),
+                    })
+                        .then(data => {
+                            resolve(data);
+                            return data;
+                        })
+                        .catch(err => {
+                            reject(err);
+                            return null;
+                        }),
                     status: 'running',
                     resolve,
-                    reject,
+                    reject
                 });
             } else {
                 this.queue.push({
                     fetcherGetter,
                     status: 'pending',
                     resolve,
-                    reject,
+                    reject
                 });
             }
-        }
+        };
         return new Promise(waiter);
     }
 
     /**
      * 等待所有任务完成
-     * @returns 等待器，等待所有任务完成
+     * @returns {Promise<boolean>} 等待器，等待所有任务完成
      */
-    waitAllDone() {
-        return new Promise((resolve, reject) => {
+    waitAllDone (): Promise<boolean> {
+        return new Promise(resolve => {
             const callback = () => {
                 if (this.queue.length === 0 && this.running_tasks.size === 0) {
                     this.eventEmitter.off('queueChange', callback);

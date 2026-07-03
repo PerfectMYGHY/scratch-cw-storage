@@ -67,9 +67,7 @@ export default class ProxyTool implements Tool {
             if (!tool.isGetSupported) {
                 return nextTool(err);
             }
-            return tool.get(reqConfig).catch(error => {
-                return nextTool(error);
-            });
+            return tool.get(reqConfig).catch(error => nextTool(error));
         };
         return nextTool();
     }

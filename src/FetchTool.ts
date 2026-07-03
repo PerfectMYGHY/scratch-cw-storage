@@ -40,7 +40,7 @@ export class FetchTool implements Tool {
             this.assetFrom, this.assetHosts[times]), Object.assign({method: 'GET'}, options))
             .then((result: Response) => {
                 if (result.ok) return resolve(result.arrayBuffer().then(b => new Uint8Array(b)));
-                if (result.status === 404) return resolve(null);
+                // if (result.status === 404) return resolve(null);
                 if (times !== this.assetHosts.length - 1) {
                     return request(times + 1, resolve, reject);
                 }
@@ -55,12 +55,12 @@ export class FetchTool implements Tool {
             });
         return new Promise((resolve, reject) => {
             this.manager.addTask(() => new Promise((res, rej) => request(0, res, rej)))
-            .then(data => {
-                resolve(data);
-            })
-            .catch(err => {
-                reject(err);
-            });
+                .then(data => {
+                    resolve(data);
+                })
+                .catch(err => {
+                    reject(err);
+                });
         });
     }
 

@@ -13,7 +13,7 @@
   "browser": "./dist/web/scratch-storage.js",
   "types": "./dist/types/index.d.ts",
   "scripts": {
-    "build": "rimraf dist && webpack --mode=production && move-to-scratch-gui.cmd",
+    "build": "rimraf dist && webpack --mode=production",
     "commitmsg": "commitlint -e $GIT_PARAMS",
     "coverage": "tap ./test/{unit,integration}/*.js --coverage --coverage-report=lcov",
     "semantic-release": "semantic-release",

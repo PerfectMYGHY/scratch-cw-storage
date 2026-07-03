@@ -131,10 +131,10 @@ class PrivateFetchWorkerTool implements Tool {
     }
 
     /**
-     * Request data from a server with a worker using fetch.
-     * @param {{url:string}} reqConfig - Request configuration for data to get.
-     * @param {{method:string}} options - Additional options to configure fetch.
-     * @returns {Promise.<Buffer|Uint8Array|null>} Resolve to Buffer of data from server.
+     * 使用 worker 通过 fetch 向服务器请求数据。
+     * @param {{url:string}} reqConfig - 请求配置，包含要获取数据的 URL。
+     * @param {{method:string}} options - 配置 fetch 的额外选项。
+     * @returns {Promise.<Buffer|Uint8Array|null>} 解析为服务器返回的数据 Buffer。
      */
     get ({url, ...options}: ScratchGetRequest): Promise<Uint8Array | null> {
         const worker = this.worker;
@@ -144,16 +144,16 @@ class PrivateFetchWorkerTool implements Tool {
         }
 
         return this.manager.addTask(() => new Promise<ArrayBuffer>((resolve, reject) => {
-            // TODO: Use a Scratch standard ID generator ...
+            // TODO: 使用 Scratch 标准的 ID 生成器……
             const id = Math.random().toString(16)
                 .substring(2);
             const augmentedOptions = applyMetadata(
                 Object.assign({method: 'GET'}, options)
             );
-            // the Fetch spec says options.headers could be:
-            // 'A Headers object, an object literal, or an array of two-item arrays to set request's headers.'
-            // structured clone (postMessage) doesn't support Headers objects
-            // so turn it into an array of two-item arrays to make it to the worker intact
+            // Fetch 规范中 options.headers 可以是：
+            // 'Headers 对象、对象字面量或成对数组，用于设置请求头'
+            // structured clone（postMessage）不支持 Headers 对象
+            // 因此将其转换为成对数组，以便完整地传递给 worker
             if (augmentedOptions && augmentedOptions.headers instanceof Headers) {
                 augmentedOptions.headers = Array.from(augmentedOptions.headers.entries());
             }

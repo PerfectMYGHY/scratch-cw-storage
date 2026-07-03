@@ -58,7 +58,7 @@ class ZipFetchTool {
     }
 
     get isGetSupported (): boolean {
-        return false;
+        return false; // 功能有问题，暂时别用，反正有FetchWorkerTool和FetchTool撑腰
     }
 
     private get assetURL (): string {

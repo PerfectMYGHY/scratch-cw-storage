@@ -20158,7 +20158,7 @@ module.exports = __webpack_require__(14)("PD94bWwgdmVyc2lvbj0iMS4wIj8+Cjxzdmcgd2
 /******/ 		// This function allow to reference async chunks
 /******/ 		__webpack_require__.u = (chunkId) => {
 /******/ 			// return url for filenames based on template
-/******/ 			return "chunks/" + "fetch-worker" + "." + "36d56ebb9d0f372cc2f3" + ".js";
+/******/ 			return "chunks/" + "fetch-worker" + "." + "d0ace9e061711484958f" + ".js";
 /******/ 		};
 /******/ 	})();
 /******/ 	
@@ -20742,7 +20742,7 @@ const exportData = {
  * 资源主机列表
  * @type {Array<string>}
  */
-const assetHosts = ['https://assets1.scratch-cw.top', 'https://assets2.scratch-cw.top', 'https://assets3.scratch-cw.top', 'https://assets4.scratch-cw.top', 'https://assets5.scratch-cw.top', 'https://assets6.scratch-cw.top'];
+const assetHosts = ['https://assets6.scratch-cw.top', 'https://assets1.scratch-cw.top', 'https://assets2.scratch-cw.top', 'https://assets3.scratch-cw.top', 'https://assets4.scratch-cw.top', 'https://assets5.scratch-cw.top'];
 /**
  * 资源原本主机（用于替换）
  * @type {string}
@@ -20792,17 +20792,17 @@ function BatchLoadManager_toPrimitive(t, r) { if ("object" != typeof t || !t) re
 
 /**
  * 分批加载管理器
- * @author 郭泓毅
+ * @author PerfectMYGHY
  * @description 管理分批加载任务
  * @see BatchLoadTask
  */
 class BatchLoadManager {
   /**
    * 分批加载管理器构造函数
-   * @param batchSize 批次大小，默认为200
+   * @param {number} batchSize 批次大小，默认为50
    */
   constructor() {
-    let batchSize = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 200;
+    let batchSize = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 50;
     /**
      * 等待执行任务队列
      */
@@ -20838,7 +20838,7 @@ class BatchLoadManager {
   }
   /**
    * 执行步骤
-   * @param fetcherGetter 加载器获取器
+   * @param {FetcherGetter} fetcherGetter 加载器获取器
    */
   step(fetcherGetter) {
     let task;
@@ -20877,8 +20877,8 @@ class BatchLoadManager {
   }
   /**
    * 添加任务
-   * @param fetcherGetter 加载器获取器
-   * @returns 等待器，等待任务完成并返回任务的返回值
+   * @param {FetcherGetter} fetcherGetter 加载器获取器
+   * @returns {Promise<Uint8Array | null>} 等待器，等待任务完成并返回任务的返回值
    */
   addTask(fetcherGetter) {
     const waiter = (resolve, reject) => {
@@ -20912,10 +20912,10 @@ class BatchLoadManager {
   }
   /**
    * 等待所有任务完成
-   * @returns 等待器，等待所有任务完成
+   * @returns {Promise<boolean>} 等待器，等待所有任务完成
    */
   waitAllDone() {
-    return new Promise((resolve, reject) => {
+    return new Promise(resolve => {
       const callback = () => {
         if (this.queue.length === 0 && this.running_tasks.size === 0) {
           this.eventEmitter.off('queueChange', callback);
@@ -21039,10 +21039,10 @@ class PrivateFetchWorkerTool {
     return typeof Worker !== 'undefined' && this._workerSupport.fetch && !this._supportError;
   }
   /**
-   * Request data from a server with a worker using fetch.
-   * @param {{url:string}} reqConfig - Request configuration for data to get.
-   * @param {{method:string}} options - Additional options to configure fetch.
-   * @returns {Promise.<Buffer|Uint8Array|null>} Resolve to Buffer of data from server.
+   * 使用 worker 通过 fetch 向服务器请求数据。
+   * @param {{url:string}} reqConfig - 请求配置，包含要获取数据的 URL。
+   * @param {{method:string}} options - 配置 fetch 的额外选项。
+   * @returns {Promise.<Buffer|Uint8Array|null>} 解析为服务器返回的数据 Buffer。
    */
   get(_ref2) {
     let url = _ref2.url,
@@ -21052,15 +21052,15 @@ class PrivateFetchWorkerTool {
       return Promise.reject(new Error('The worker could not be initialized'));
     }
     return this.manager.addTask(() => new Promise((resolve, reject) => {
-      // TODO: Use a Scratch standard ID generator ...
+      // TODO: 使用 Scratch 标准的 ID 生成器……
       const id = Math.random().toString(16).substring(2);
       const augmentedOptions = applyMetadata(Object.assign({
         method: 'GET'
       }, options));
-      // the Fetch spec says options.headers could be:
-      // 'A Headers object, an object literal, or an array of two-item arrays to set request's headers.'
-      // structured clone (postMessage) doesn't support Headers objects
-      // so turn it into an array of two-item arrays to make it to the worker intact
+      // Fetch 规范中 options.headers 可以是：
+      // 'Headers 对象、对象字面量或成对数组，用于设置请求头'
+      // structured clone（postMessage）不支持 Headers 对象
+      // 因此将其转换为成对数组，以便完整地传递给 worker
       if (augmentedOptions && augmentedOptions.headers instanceof Headers) {
         augmentedOptions.headers = Array.from(augmentedOptions.headers.entries());
       }
@@ -21200,7 +21200,7 @@ class FetchTool {
       method: 'GET'
     }, options)).then(result => {
       if (result.ok) return resolve(result.arrayBuffer().then(b => new Uint8Array(b)));
-      if (result.status === 404) return resolve(null);
+      // if (result.status === 404) return resolve(null);
       if (times !== this.assetHosts.length - 1) {
         return request(times + 1, resolve, reject);
       }
@@ -21300,7 +21300,7 @@ class ZipFetchTool {
     this.storage = parent;
   }
   get isGetSupported() {
-    return false;
+    return false; // 功能有问题，暂时别用，反正有FetchWorkerTool和FetchTool撑腰
   }
   get assetURL() {
     return this.storage.assetHost;
@@ -21668,9 +21668,7 @@ class ProxyTool {
       if (!tool.isGetSupported) {
         return nextTool(err);
       }
-      return tool.get(reqConfig).catch(error => {
-        return nextTool(error);
-      });
+      return tool.get(reqConfig).catch(error => nextTool(error));
     };
     return nextTool();
   }

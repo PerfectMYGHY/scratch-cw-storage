@@ -53,7 +53,7 @@ const onMessage = ({data: job}) => {
     crossFetch(job.url, job.options)
         .then(result => {
             if (result.ok) return result.arrayBuffer();
-            if (result.status === 404) return null;
+            // if (result.status === 404) return null;
             return Promise.reject(result.status);
         })
         .then(buffer => complete.push({id: job.id, buffer}))

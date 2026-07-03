@@ -782,7 +782,7 @@ const onMessage = _ref => {
   jobsActive++;
   crossFetch(job.url, job.options).then(result => {
     if (result.ok) return result.arrayBuffer();
-    if (result.status === 404) return null;
+    // if (result.status === 404) return null;
     return Promise.reject(result.status);
   }).then(buffer => complete.push({
     id: job.id,
@@ -803,4 +803,4 @@ self.addEventListener('message', onMessage);
 module.exports = __webpack_exports__;
 /******/ })()
 ;
-//# sourceMappingURL=fetch-worker.36d56ebb9d0f372cc2f3.js.map
+//# sourceMappingURL=fetch-worker.d0ace9e061711484958f.js.map
