@@ -1,5 +1,5 @@
 /** 加载器 */
-type Fetcher = Promise<Uint8Array | null>;
+type Fetcher = Promise<Uint8Array | string | null>;
 /** 加载器获取器 */
 type FetcherGetter = () => Fetcher;
 /**
@@ -38,9 +38,9 @@ declare class BatchLoadManager {
     /**
      * 添加任务
      * @param {FetcherGetter} fetcherGetter 加载器获取器
-     * @returns {Promise<Uint8Array | null>} 等待器，等待任务完成并返回任务的返回值
+     * @returns {Promise<Uint8Array | string | null>} 等待器，等待任务完成并返回任务的返回值
      */
-    addTask(fetcherGetter: FetcherGetter): Promise<Uint8Array | null>;
+    addTask(fetcherGetter: FetcherGetter): Promise<Uint8Array | string | null>;
     /**
      * 等待所有任务完成
      * @returns {Promise<boolean>} 等待器，等待所有任务完成

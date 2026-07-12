@@ -242,11 +242,17 @@ class ZipFetchTool {
         assets: Array<AssetInfo | string>
     ): Promise<ZipSendList> {
         const zipSendList: ZipSendList = new Map<JSZip, string[]>();
-        const cache: { name: string; data: Uint8Array }[] = [];
+        let cache: { name: string; data: Uint8Array }[] = [];
         let currentSize = 0;
-        const MAX_SIZE = 7.875 * 1024 * 1024; // 7.875 MB
+        let currentNum = 0;
+        const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
+        const MAX_NUM = 100;
 
-        for (const {data, assetName} of assets as AssetInfo[]) {
+        for (const asset of assets) {
+            if (typeof asset === 'string') {
+                continue; // 不对无数据素材进行打包
+            }
+            const {data, assetName} = asset;
             let assetData: Uint8Array;
             try {
                 assetData = ZipFetchTool.toUint8Array(data);
@@ -256,25 +262,34 @@ class ZipFetchTool {
             }
             const assetSize = assetData.byteLength;
 
-            cache.push({name: assetName, data: assetData});
-            currentSize += assetSize;
-
-            if (currentSize > MAX_SIZE) {
+            if (cache.length > 0 && ((currentSize + assetSize) > MAX_SIZE || (currentNum + 1) > MAX_NUM)) {
                 const zip = new JSZip();
                 for (const item of cache) {
-                    zip.file(item.name, item.data);
+                    try {
+                        zip.file(item.name, item.data);
+                    } catch (error) {
+                        console.error(`Failed to add ${item.name} to zip:`, error);
+                    }
                 }
-                // const zipBlob = await zip.generateAsync({type: 'blob'});
                 zipSendList.set(zip, cache.map(item => item.name));
-                cache.length = 0;
+                cache = [];
                 currentSize = 0;
+                currentNum = 0;
             }
+
+            cache.push({name: assetName, data: assetData});
+            currentSize += assetSize;
+            currentNum++;
         }
 
         if (cache.length > 0) {
             const zip = new JSZip();
             for (const item of cache) {
-                zip.file(item.name, item.data);
+                try {
+                    zip.file(item.name, item.data);
+                } catch (error) {
+                    console.error(`Failed to add ${item.name} to zip:`, error);
+                }
             }
             // const zipBlob = await zip.generateAsync({type: 'blob'});
             zipSendList.set(zip, cache.map(item => item.name));

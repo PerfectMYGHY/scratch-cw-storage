@@ -178,7 +178,7 @@ class PrivateFetchWorkerTool implements Tool {
             };
         })
             /* eslint no-confusing-arrow: ['error', {'allowParens': true}] */
-            .then(body => (body ? new Uint8Array(body) : null)));
+            .then(body => (body ? new Uint8Array(body) : null))) as Promise<Uint8Array | null>;
     }
 
     /**

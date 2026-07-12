@@ -56,7 +56,7 @@ export class FetchTool implements Tool {
         return new Promise((resolve, reject) => {
             this.manager.addTask(() => new Promise((res, rej) => request(0, res, rej)))
                 .then(data => {
-                    resolve(data);
+                    resolve(data as Uint8Array | null);
                 })
                 .catch(err => {
                     reject(err);
@@ -79,12 +79,29 @@ export class FetchTool implements Tool {
      * @returns {Promise.<string>} Server returned metadata.
      */
     send ({url, withCredentials = false, ...options}: ScratchSendRequest): Promise<string> {
-        return scratchFetch(url, Object.assign({
-            credentials: withCredentials ? 'include' : 'omit'
-        }, options))
-            .then(response => {
-                if (response.ok) return response.text();
-                return Promise.reject(response.status);
-            });
+        return new Promise((resolve, reject) => {
+            this.manager.addTask(() => new Promise((_resolve, _reject) => {
+                scratchFetch(url, Object.assign({
+                    credentials: withCredentials ? 'include' : 'omit'
+                }, options))
+                    .then(response => {
+                        if (response.ok) return response.text();
+                        return Promise.reject(response.status);
+                    })
+                    .then(data => {
+                        _resolve(data);
+                    })
+                    .catch(err => {
+                        _reject(err);
+                    });
+            })
+            )
+                .then(data => {
+                    resolve(data as string);
+                })
+                .catch(err => {
+                    reject(err);
+                });
+        });
     }
 }

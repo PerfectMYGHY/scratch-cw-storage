@@ -20878,7 +20878,7 @@ class BatchLoadManager {
   /**
    * 添加任务
    * @param {FetcherGetter} fetcherGetter 加载器获取器
-   * @returns {Promise<Uint8Array | null>} 等待器，等待任务完成并返回任务的返回值
+   * @returns {Promise<Uint8Array | string | null>} 等待器，等待任务完成并返回任务的返回值
    */
   addTask(fetcherGetter) {
     const waiter = (resolve, reject) => {
@@ -21238,11 +21238,23 @@ class FetchTool {
       _ref2$withCredentials = _ref2.withCredentials,
       withCredentials = _ref2$withCredentials === void 0 ? false : _ref2$withCredentials,
       options = FetchTool_objectWithoutProperties(_ref2, _excluded2);
-    return scratchFetch(url, Object.assign({
-      credentials: withCredentials ? 'include' : 'omit'
-    }, options)).then(response => {
-      if (response.ok) return response.text();
-      return Promise.reject(response.status);
+    return new Promise((resolve, reject) => {
+      this.manager.addTask(() => new Promise((_resolve, _reject) => {
+        scratchFetch(url, Object.assign({
+          credentials: withCredentials ? 'include' : 'omit'
+        }, options)).then(response => {
+          if (response.ok) return response.text();
+          return Promise.reject(response.status);
+        }).then(data => {
+          _resolve(data);
+        }).catch(err => {
+          _reject(err);
+        });
+      })).then(data => {
+        resolve(data);
+      }).catch(err => {
+        reject(err);
+      });
     });
   }
 }
@@ -21460,12 +21472,17 @@ class ZipFetchTool {
    */
   _getSendZipListFromAssets(assets) {
     const zipSendList = new Map();
-    const cache = [];
+    let cache = [];
     let currentSize = 0;
-    const MAX_SIZE = 7.875 * 1024 * 1024; // 7.875 MB
-    for (const _ref4 of assets) {
-      const data = _ref4.data;
-      const assetName = _ref4.assetName;
+    let currentNum = 0;
+    const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
+    const MAX_NUM = 100;
+    for (const asset of assets) {
+      if (typeof asset === 'string') {
+        continue; // 不对无数据素材进行打包
+      }
+      const data = asset.data,
+        assetName = asset.assetName;
       let assetData;
       try {
         assetData = ZipFetchTool.toUint8Array(data);
@@ -21474,26 +21491,36 @@ class ZipFetchTool {
         continue; // 跳过当前迭代
       }
       const assetSize = assetData.byteLength;
+      if (cache.length > 0 && (currentSize + assetSize > MAX_SIZE || currentNum + 1 > MAX_NUM)) {
+        const zip = new (jszip_min_default())();
+        for (const item of cache) {
+          try {
+            zip.file(item.name, item.data);
+          } catch (error) {
+            console.error("Failed to add ".concat(item.name, " to zip:"), error);
+          }
+        }
+        // const zipBlob = await zip.generateAsync({type: 'blob'});
+        zipSendList.set(zip, cache.map(item => item.name));
+        cache = [];
+        currentSize = 0;
+        currentNum = 0;
+      }
       cache.push({
         name: assetName,
         data: assetData
       });
       currentSize += assetSize;
-      if (currentSize > MAX_SIZE) {
-        const zip = new (jszip_min_default())();
-        for (const item of cache) {
-          zip.file(item.name, item.data);
-        }
-        // const zipBlob = await zip.generateAsync({type: 'blob'});
-        zipSendList.set(zip, cache.map(item => item.name));
-        cache.length = 0;
-        currentSize = 0;
-      }
+      currentNum++;
     }
     if (cache.length > 0) {
       const zip = new (jszip_min_default())();
       for (const item of cache) {
-        zip.file(item.name, item.data);
+        try {
+          zip.file(item.name, item.data);
+        } catch (error) {
+          console.error("Failed to add ".concat(item.name, " to zip:"), error);
+        }
       }
       // const zipBlob = await zip.generateAsync({type: 'blob'});
       zipSendList.set(zip, cache.map(item => item.name));
@@ -21520,10 +21547,10 @@ class ZipFetchTool {
   async _upload(zipSendList) {
     const errors = new Map();
     this.zipUploadingEvents.off('uploadedZip');
-    for (const _ref5 of zipSendList.entries()) {
-      var _ref6 = ZipFetchTool_slicedToArray(_ref5, 2);
-      const zip = _ref6[0];
-      const assetNames = _ref6[1];
+    for (const _ref4 of zipSendList.entries()) {
+      var _ref5 = ZipFetchTool_slicedToArray(_ref4, 2);
+      const zip = _ref5[0];
+      const assetNames = _ref5[1];
       try {
         const zipBlob = await zip.generateAsync({
           type: 'blob'
@@ -21581,9 +21608,9 @@ class ZipFetchTool {
   get isSendSupported() {
     return true;
   }
-  send(_ref7) {
-    let asset = _ref7.asset,
-      options = ZipFetchTool_objectWithoutProperties(_ref7, ZipFetchTool_excluded2);
+  send(_ref6) {
+    let asset = _ref6.asset,
+      options = ZipFetchTool_objectWithoutProperties(_ref6, ZipFetchTool_excluded2);
     if (options.url && options.url.includes('backpack') || this.storage.currentAssetFrom === 'backpack') {
       return new Promise((resolve, reject) => {
         reject(new Error('ZipFetchTool只适合处理项目资源加速加载！不支持背包素材！'));

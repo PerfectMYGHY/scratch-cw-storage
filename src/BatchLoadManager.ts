@@ -1,13 +1,13 @@
 import createEventEmitter, {EventEmitter} from './EventEmitter';
 
 /** 加载器 */
-type Fetcher = Promise<Uint8Array | null>;
+type Fetcher = Promise<Uint8Array | string | null>;
 /** 加载器获取器 */
 type FetcherGetter = () => Fetcher;
 /** 任务状态 */
 type Status = 'pending' | 'running';
 /** 等待器解析函数 */
-type WaiterResolve = (data: Uint8Array | null) => void;
+type WaiterResolve = (data: Uint8Array | string | null) => void;
 /** 等待器拒绝函数 */
 type WaiterReject = (err: unknown) => void;
 /** 等待器 */
@@ -129,9 +129,9 @@ class BatchLoadManager {
     /**
      * 添加任务
      * @param {FetcherGetter} fetcherGetter 加载器获取器
-     * @returns {Promise<Uint8Array | null>} 等待器，等待任务完成并返回任务的返回值
+     * @returns {Promise<Uint8Array | string | null>} 等待器，等待任务完成并返回任务的返回值
      */
-    public addTask (fetcherGetter: FetcherGetter): Promise<Uint8Array | null> {
+    public addTask (fetcherGetter: FetcherGetter): Promise<Uint8Array | string | null> {
         const waiter: Waiter = (resolve, reject) => {
             if (this.running_tasks.size < this.batchSize) {
                 this.running_tasks.set(fetcherGetter, {
